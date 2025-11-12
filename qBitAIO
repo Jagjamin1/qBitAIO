@@ -1,10 +1,7 @@
-# Version 1.0
+# Version 1.1
 # Author: Jagjamin
 
 import qbittorrentapi
-import time
-import datetime
-import tabulate
 import os
 import json
 import tkinter as tk
@@ -33,7 +30,8 @@ else: settings = {
     "total size": 0,
     "remaining size": 0,
     "download speed": 0,
-    "closest torrents": 0
+    "closest torrents": 0,
+    "update rate": 1000
 }
 
 def submit(m):
@@ -63,13 +61,15 @@ def submit_settings(m):
     remaining_size = rsb.get()
     download_speed = dsb.get()
     closest_torrents = close_int.get()
+    update_speed = updaterate.get()
 
     global settings
     settings = {
         "total size": total_size,
         "remaining size": remaining_size,
         "download speed": download_speed,
-        "closest torrents": int(closest_torrents)
+        "closest torrents": int(closest_torrents),
+        "update rate": int(update_speed)
     }
     try:
         with open("settings.json", "w") as json_file:
@@ -104,6 +104,7 @@ def open_settings(m):
     remaining_size=data["remaining size"]
     download_speed=data["download speed"]
     closest_torrents=data["closest torrents"]
+    update_speed=data["update rate"]
     m.delete("1.0", tk.END)
     m.insert("1.0", "Total Size is: ")
     m.insert(tk.END, total_size)
@@ -113,6 +114,9 @@ def open_settings(m):
     m.insert(tk.END, download_speed)
     m.insert(tk.END, "\nSoonest torrents shown is: ")
     m.insert(tk.END, closest_torrents)
+    m.insert(tk.END, "\nUpdate rate is:")
+    m.insert(tk.END, update_speed)
+    m.insert(tk.END, "ms")
 
 
 def format_bytes(size):
@@ -140,6 +144,17 @@ def display_main():
         "Total Size" : totalsize, "Remaining Amount" : remaining, "Download Speed" : speed + "/s"
     }
     return display_dict
+
+def update_tree():
+    for item in display.get_children():
+        display.delete(item)
+
+    new_data = display_main()
+    rows = list(new_data.values())
+
+    display.insert("","end", values=rows)
+
+    display.after(settings["update rate"], update_tree)
 
 root = tk.Tk() # Main window
 root.title("qBitTorrent Live Monitoring")
@@ -170,7 +185,9 @@ for col in columns:
     display.heading(col, text=col)
     display.column(col, anchor="center", width=80)
 display.pack(padx=10,pady=10,fill="both",expand=True)
-display.insert("","end", values=rows)
+display.insert("", "end", values=rows)
+update_tree()
+
 
 #Creating content for Host Setting tab
 host_label = ttk.Label(host_frame, text="Host IP")
@@ -205,6 +222,7 @@ tsb = tk.BooleanVar(value=settings["total size"])
 rsb = tk.BooleanVar(value=settings["remaining size"])
 dsb = tk.BooleanVar(value=settings["download speed"])
 close_int = tk.IntVar(value=settings["closest torrents"])
+updaterate = tk.IntVar(value=settings["update rate"])
 options_frame.columnconfigure(0, weight=1)
 options_frame.columnconfigure(1, weight=1)
 options_frame.columnconfigure(2, weight=1)
@@ -217,7 +235,11 @@ total_download_speed.grid(row=2, column=0, sticky="W", padx=20, pady=5)
 closest_torrents_label = ttk.Label(options_frame, text="Soonest Torrents Display Amount")
 closest_torrents_label.grid(row=3, column=0, padx=20, pady=5)
 closest_torrents_entry = ttk.Entry(options_frame, textvariable=close_int)
-closest_torrents_entry.grid(row=4, column=0, padx=20, pady=5)
+closest_torrents_entry.grid(row=3, column=1, padx=20, pady=5)
+update_speed_label = ttk.Label(options_frame,text="Update rate in milliseconds")
+update_speed_label.grid(row=4, column=0, padx=20, pady=5)
+update_speed_entry = ttk.Entry(options_frame, textvariable=updaterate)
+update_speed_entry.grid(row=4, column=1, padx=20, pady=5)
 settings_submit_button = tk.Button(options_frame, text="Save Settings", width=25, height=5, command = lambda : submit_settings(settings_check_box))
 settings_submit_button.grid(row=5)
 settings_check_button = tk.Button(options_frame, text="Check current settings", width=25, height=5, command = lambda : open_settings(settings_check_box))
