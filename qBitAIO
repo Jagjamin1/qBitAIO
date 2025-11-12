@@ -1,0 +1,228 @@
+# Version 1.0
+# Author: Jagjamin
+
+import qbittorrentapi
+import time
+import datetime
+import tabulate
+import os
+import json
+import tkinter as tk
+from tkinter import ttk
+
+hostvar = tk.StringVar
+portvar = tk.IntVar
+uservar = tk.StringVar
+passvar = tk.StringVar
+
+
+if os.path.exists("host.json"):
+    with open("host.json", "r") as file:
+        hostdict = json.load(file)
+else: hostdict = {
+    "host": "localhost",
+    "port": 8080,
+    "username": "admin",
+    "password": "password"
+}
+
+if os.path.exists("settings.json"):
+    with open("settings.json", "r") as file:
+        settings = json.load(file)
+else: settings = {
+    "total size": 0,
+    "remaining size": 0,
+    "download speed": 0,
+    "closest torrents": 0
+}
+
+def submit(m):
+    host = host_entry.get()
+    port = port_entry.get()
+    username = username_entry.get()
+    password = pass_entry.get()
+
+    global hostdict
+    hostdict = {
+        "host": host,
+        "port": int(port),
+        "username": username,
+        "password": password
+    }
+    try:
+        with open("host.json", "w") as json_file:
+            json.dump(hostdict, json_file, indent=4)
+        m.delete("1.0", tk.END)
+        m.insert(tk.END, "Settings Updated")
+    except IOError:
+        m.delete("1.0", tk.END)
+        m.insert(tk.END, "Error updating")
+
+def submit_settings(m):
+    total_size = tsb.get()
+    remaining_size = rsb.get()
+    download_speed = dsb.get()
+    closest_torrents = close_int.get()
+
+    global settings
+    settings = {
+        "total size": total_size,
+        "remaining size": remaining_size,
+        "download speed": download_speed,
+        "closest torrents": int(closest_torrents)
+    }
+    try:
+        with open("settings.json", "w") as json_file:
+            json.dump(settings, json_file, indent=4)
+        m.delete("1.0", tk.END)
+        m.insert(tk.END, "Settings Updated")
+    except IOError:
+        m.delete("1.0", tk.END)
+        m.insert(tk.END, "Error updating")
+
+def openjson(m):
+    with open("host.json", "r") as file:
+        data = json.load(file)
+    host=data["host"]
+    port=data["port"]
+    username=data["username"]
+    password=data["password"]
+    m.delete("1.0", tk.END)
+    m.insert("1.0", "Host is: ")
+    m.insert(tk.END,host)
+    m.insert(tk.END,"\nPort is: ")
+    m.insert(tk.END,port )
+    m.insert(tk.END,"\nUsername is: ")
+    m.insert(tk.END, username)
+    m.insert(tk.END, "\nPassword is: ")
+    m.insert(tk.END, password)
+
+def open_settings(m):
+    with open("settings.json", "r") as file:
+        data = json.load(file)
+    total_size=data["total size"]
+    remaining_size=data["remaining size"]
+    download_speed=data["download speed"]
+    closest_torrents=data["closest torrents"]
+    m.delete("1.0", tk.END)
+    m.insert("1.0", "Total Size is: ")
+    m.insert(tk.END, total_size)
+    m.insert(tk.END,"\nRemaining Size is: ")
+    m.insert(tk.END, remaining_size )
+    m.insert(tk.END,"\nDownload Speed is: ")
+    m.insert(tk.END, download_speed)
+    m.insert(tk.END, "\nSoonest torrents shown is: ")
+    m.insert(tk.END, closest_torrents)
+
+
+def format_bytes(size):
+    # 2**10 = 1024
+    power = 2 ** 10
+    n = 0
+    power_labels = {0: '', 1: 'kilo', 2: 'mega', 3: 'giga', 4: 'tera'}
+    while size > power:
+        size /= power
+        n += 1
+    return f"{round(size, 2)} {power_labels[n]}bytes"
+
+def display_main():
+    totalsize=0
+    remaining=0
+    speed=0
+    for torrent in qbt_client.torrents_info():
+        totalsize=totalsize+torrent.size
+        remaining=remaining+torrent.amount_left
+        speed=speed+torrent.dlspeed
+    totalsize = format_bytes((totalsize))
+    remaining = format_bytes(remaining)
+    speed = format_bytes(speed)
+    display_dict = {
+        "Total Size" : totalsize, "Remaining Amount" : remaining, "Download Speed" : speed + "/s"
+    }
+    return display_dict
+
+root = tk.Tk() # Main window
+root.title("qBitTorrent Live Monitoring")
+root.geometry("800x600")
+root.resizable(True, True)
+
+notebook = ttk.Notebook(root) # Notebook within main window
+notebook.pack(fill="both", expand=1) # Make notebook fill window
+
+live_frame = ttk.Frame(notebook) # Tab for live monitoring
+host_frame = ttk.Frame(notebook) # Tab for host setting
+options_frame = ttk.Frame(notebook) # Tab for options
+
+# Add tabs to the notebook
+notebook.add(live_frame, text="Monitoring")
+notebook.add(host_frame, text="Host Settings")
+notebook.add(options_frame, text="General Settings")
+
+# Creating content for live monitoring tab
+live_widget=tk.Text(live_frame, wrap="word")
+live_widget.pack(expand=True, fill="both")
+qbt_client = qbittorrentapi.Client(**hostdict)
+display_dict = display_main()
+columns = list(display_dict.keys())
+rows = list(display_dict.values())
+display = ttk.Treeview(live_widget, columns=columns, show="headings")
+for col in columns:
+    display.heading(col, text=col)
+    display.column(col, anchor="center", width=80)
+display.pack(padx=10,pady=10,fill="both",expand=True)
+display.insert("","end", values=rows)
+
+#Creating content for Host Setting tab
+host_label = ttk.Label(host_frame, text="Host IP")
+host_label.pack(pady=10)
+host_entry = ttk.Entry(host_frame, textvariable= hostvar, exportselection=False)
+host_entry.insert(tk.END, hostdict["host"])
+host_entry.pack()
+port_label = ttk.Label(host_frame, text="Host Port Number")
+port_label.pack(pady=10)
+port_entry = ttk.Entry(host_frame, textvariable= portvar, exportselection=False)
+port_entry.insert(tk.END, hostdict["port"])
+port_entry.pack()
+username_label = ttk.Label(host_frame, text="Username")
+username_label.pack(pady=10)
+username_entry = ttk.Entry(host_frame, textvariable= uservar, exportselection=False)
+username_entry.insert(tk.END, hostdict["username"])
+username_entry.pack()
+pass_label = ttk.Label(host_frame, text="Password")
+pass_label.pack(pady=10)
+pass_entry = ttk.Entry(host_frame, textvariable= passvar, exportselection=False)
+pass_entry.insert(tk.END, hostdict["password"])
+pass_entry.pack()
+submit_button = tk.Button(host_frame, text="Save Settings", width=25, height=5, command = lambda : submit(check_box))
+submit_button.pack()
+check_button = tk.Button(host_frame, text="Check current settings", width=25, height=5, command = lambda : openjson(check_box))
+check_button.pack()
+check_box = tk.Text(host_frame)
+check_box.pack()
+
+#Creating content for Options tab
+tsb = tk.BooleanVar(value=settings["total size"])
+rsb = tk.BooleanVar(value=settings["remaining size"])
+dsb = tk.BooleanVar(value=settings["download speed"])
+close_int = tk.IntVar(value=settings["closest torrents"])
+options_frame.columnconfigure(0, weight=1)
+options_frame.columnconfigure(1, weight=1)
+options_frame.columnconfigure(2, weight=1)
+total_size_button = ttk.Checkbutton(options_frame, text="Total Size", variable=tsb)
+total_size_button.grid(row=0, column=0, sticky="W", padx=20, pady=5)
+remaining_size_button = ttk.Checkbutton(options_frame, text="Remaining Size", variable=rsb)
+remaining_size_button.grid(row=1, column=0, sticky="W", padx=20,pady=5)
+total_download_speed = ttk.Checkbutton(options_frame, text="Total Download Speed", variable=dsb)
+total_download_speed.grid(row=2, column=0, sticky="W", padx=20, pady=5)
+closest_torrents_label = ttk.Label(options_frame, text="Soonest Torrents Display Amount")
+closest_torrents_label.grid(row=3, column=0, padx=20, pady=5)
+closest_torrents_entry = ttk.Entry(options_frame, textvariable=close_int)
+closest_torrents_entry.grid(row=4, column=0, padx=20, pady=5)
+settings_submit_button = tk.Button(options_frame, text="Save Settings", width=25, height=5, command = lambda : submit_settings(settings_check_box))
+settings_submit_button.grid(row=5)
+settings_check_button = tk.Button(options_frame, text="Check current settings", width=25, height=5, command = lambda : open_settings(settings_check_box))
+settings_check_button.grid(row=6)
+settings_check_box = tk.Text(options_frame)
+settings_check_box.grid(row=7)
+root.mainloop()
+
